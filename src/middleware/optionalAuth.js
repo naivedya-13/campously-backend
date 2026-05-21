@@ -1,26 +1,22 @@
 const jwt = require('jsonwebtoken');
 const { jwtSecret } = require('../config/env');
 
-const authMiddleware = (req, res, next) => {
+const optionalAuth = (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
         let token = null;
-
         if (authHeader?.startsWith('Bearer ')) {
             token = authHeader.split(' ')[1];
         } else if (req.cookies?.accessToken) {
             token = req.cookies.accessToken;
         }
-
-        if (!token) {
-            return res.status(401).json({ error: 'Access denied. No token provided.' });
+        if (token) {
+            req.user = jwt.verify(token, jwtSecret);
         }
-
-        req.user = jwt.verify(token, jwtSecret);
-        next();
     } catch {
-        return res.status(403).json({ error: 'Invalid or expired token.' });
+        // unauthenticated is fine
     }
+    next();
 };
 
-module.exports = authMiddleware;
+module.exports = optionalAuth;

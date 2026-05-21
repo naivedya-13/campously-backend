@@ -1,5 +1,5 @@
 const {
-    findUserByEmail,
+    findUserByEnrollmentId,
     hashPassword,
     comparePassword,
     createAdminUser,
@@ -9,19 +9,24 @@ const {
 
 const register = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, enrollmentId, email, password } = req.body;
 
-        if (!name || !email || !password) {
-            return res.status(400).json({ error: 'Name, email, and password are required.' });
+        if (!name || !enrollmentId || !password) {
+            return res.status(400).json({ error: 'Name, enrollment ID, and password are required.' });
         }
 
-        const existingUser = await findUserByEmail(email);
+        const existingUser = await findUserByEnrollmentId(enrollmentId);
         if (existingUser) {
-            return res.status(400).json({ error: 'User already exists with this email.' });
+            return res.status(400).json({ error: 'User already exists with this enrollment ID.' });
         }
 
         const hashedPassword = await hashPassword(password);
-        const newUser = await createAdminUser({ name, email, password: hashedPassword });
+        const newUser = await createAdminUser({
+            name,
+            enrollmentId,
+            email: email || null,
+            password: hashedPassword,
+        });
 
         res.status(201).json({
             message: 'Admin registered successfully.',
@@ -34,13 +39,13 @@ const register = async (req, res) => {
 
 const login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { enrollmentId, password } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required.' });
+        if (!enrollmentId || !password) {
+            return res.status(400).json({ error: 'Enrollment ID and password are required.' });
         }
 
-        const user = await findUserByEmail(email);
+        const user = await findUserByEnrollmentId(enrollmentId);
         if (!user || user.role !== 'ADMIN') {
             return res.status(400).json({ error: 'Invalid admin credentials.' });
         }

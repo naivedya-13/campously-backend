@@ -7,7 +7,6 @@ const {
     getCartWithItems,
     findProductById,
 } = require('./helper');
-
 const addToCart = async (req, res) => {
     try {
         const userId = req.user.id;
@@ -22,25 +21,24 @@ const addToCart = async (req, res) => {
         if (!product) {
             return res.status(404).json({ error: 'Product not found.' });
         }
+        if (product.stock < quantity) {
+            return res.status(400).json({ error: 'Insufficient stock.' });
+        }
 
         const cart = await getOrCreateCart(userId);
         const existingItem = await findCartItem(cart.id, productId);
 
         if (existingItem) {
-            const item = await updateCartItemQuantity(
+            await updateCartItemQuantity(
                 existingItem.id,
                 existingItem.quantity + quantity
             );
-            return res.status(200).json({ message: 'Cart quantity updated.', item });
+        } else {
+            await addCartItem({ cartId: cart.id, productId, quantity });
         }
 
-        const item = await addCartItem({
-            cartId: cart.id,
-            productId,
-            quantity,
-        });
-
-        res.status(201).json({ message: 'Added to cart.', item });
+        const cartData = await getCartWithItems(userId);
+        res.status(200).json({ message: 'Added to cart.', ...cartData });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -48,13 +46,8 @@ const addToCart = async (req, res) => {
 
 const getCart = async (req, res) => {
     try {
-        const cart = await getCartWithItems(req.user.id);
-
-        if (!cart || cart.items.length === 0) {
-            return res.status(200).json({ message: 'Your cart is empty.', items: [] });
-        }
-
-        res.status(200).json(cart);
+        const cartData = await getCartWithItems(req.user.id);
+        res.status(200).json(cartData);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -62,15 +55,16 @@ const getCart = async (req, res) => {
 
 const updateCartItem = async (req, res) => {
     try {
-        const itemId = parseInt(req.params.itemId, 10);
+        const itemId = parseInt(req.body.itemId || req.params.id, 10);
         const quantity = parseInt(req.body.quantity, 10);
 
         if (!quantity || quantity < 1) {
             return res.status(400).json({ error: 'Quantity must be at least 1.' });
         }
 
-        const item = await updateCartItemQuantity(itemId, quantity);
-        res.status(200).json({ message: 'Cart item updated.', item });
+        await updateCartItemQuantity(itemId, quantity);
+        const cartData = await getCartWithItems(req.user.id);
+        res.status(200).json({ message: 'Cart updated.', ...cartData });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -78,12 +72,25 @@ const updateCartItem = async (req, res) => {
 
 const deleteCartItem = async (req, res) => {
     try {
-        const itemId = parseInt(req.params.itemId, 10);
+        const itemId = parseInt(req.params.id, 10);
         await removeCartItem(itemId);
-        res.status(200).json({ message: 'Item removed from cart.' });
+        const cartData = await getCartWithItems(req.user.id);
+        res.status(200).json({ message: 'Item removed.', ...cartData });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 };
 
-module.exports = { addToCart, getCart, updateCartItem, deleteCartItem };
+const clearCart = async (req, res) => {
+    try {
+        const cart = await getOrCreateCart(req.user.id);
+        await require('../../../config/prisma').cartItem.deleteMany({
+            where: { cartId: cart.id },
+        });
+        res.status(200).json({ message: 'Cart cleared.', items: [], total: 0, itemCount: 0 });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+module.exports = { addToCart, getCart, updateCartItem, deleteCartItem, clearCart };

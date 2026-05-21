@@ -1,4 +1,5 @@
 const prisma = require('../../../config/prisma');
+const { formatProduct, productInclude } = require('../../../utils/formatProduct');
 
 const getOrCreateWishlist = async (userId) => {
     let wishlist = await prisma.wishlist.findUnique({ where: { userId } });
@@ -8,32 +9,18 @@ const getOrCreateWishlist = async (userId) => {
     return wishlist;
 };
 
-const findWishlistItem = (wishlistId, productId) =>
-    prisma.wishlistItem.findUnique({
-        where: { wishlistId_productId: { wishlistId, productId } },
-    });
-
-const addWishlistItem = (data) => prisma.wishlistItem.create({ data });
-
-const removeWishlistItem = (id) => prisma.wishlistItem.delete({ where: { id } });
-
-const getWishlistWithItems = (userId) =>
-    prisma.wishlist.findUnique({
+const getWishlistWithItems = async (userId) => {
+    const wishlist = await prisma.wishlist.findUnique({
         where: { userId },
         include: {
             items: {
-                include: { product: true },
+                include: { product: { include: productInclude } },
             },
         },
     });
 
-const findProductById = (id) => prisma.product.findUnique({ where: { id } });
-
-module.exports = {
-    getOrCreateWishlist,
-    findWishlistItem,
-    addWishlistItem,
-    removeWishlistItem,
-    getWishlistWithItems,
-    findProductById,
+    const items = (wishlist?.items || []).map((item) => formatProduct(item.product));
+    return { items, itemCount: items.length };
 };
+
+module.exports = { getOrCreateWishlist, getWishlistWithItems, formatProduct };

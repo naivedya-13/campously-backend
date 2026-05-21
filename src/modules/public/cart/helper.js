@@ -1,4 +1,5 @@
 const prisma = require('../../../config/prisma');
+const { formatProduct, productInclude } = require('../../../utils/formatProduct');
 
 const getOrCreateCart = async (userId) => {
     let cart = await prisma.cart.findUnique({ where: { userId } });
@@ -6,6 +7,45 @@ const getOrCreateCart = async (userId) => {
         cart = await prisma.cart.create({ data: { userId } });
     }
     return cart;
+};
+
+const formatCartResponse = (cart) => {
+    if (!cart?.items?.length) {
+        return { items: [], total: 0, itemCount: 0 };
+    }
+
+    const items = cart.items.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        product: formatProduct(item.product),
+        productName: item.product.name,
+        price: item.product.price,
+        image: item.product.images?.[0]?.url || '',
+    }));
+
+    const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+
+    return {
+        id: cart.id,
+        items,
+        total,
+        itemCount: items.reduce((s, i) => s + i.quantity, 0),
+    };
+};
+
+const getCartWithItems = async (userId) => {
+    const cart = await prisma.cart.findUnique({
+        where: { userId },
+        include: {
+            items: {
+                include: {
+                    product: { include: productInclude },
+                },
+            },
+        },
+    });
+    return formatCartResponse(cart);
 };
 
 const findCartItem = (cartId, productId) =>
@@ -20,24 +60,15 @@ const updateCartItemQuantity = (id, quantity) =>
 
 const removeCartItem = (id) => prisma.cartItem.delete({ where: { id } });
 
-const getCartWithItems = (userId) =>
-    prisma.cart.findUnique({
-        where: { userId },
-        include: {
-            items: {
-                include: { product: true },
-            },
-        },
-    });
-
 const findProductById = (id) => prisma.product.findUnique({ where: { id } });
 
 module.exports = {
     getOrCreateCart,
+    getCartWithItems,
     findCartItem,
     addCartItem,
     updateCartItemQuantity,
     removeCartItem,
-    getCartWithItems,
     findProductById,
+    formatCartResponse,
 };
