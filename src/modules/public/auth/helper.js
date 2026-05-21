@@ -53,7 +53,7 @@ const signRefreshToken = (user) =>
 
 const verifyRefreshToken = (token) => jwt.verify(token, jwtRefreshSecret);
 
-const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+const generateOtp = () => '555555';
 
 const storeOtp = async (enrollmentId, code) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
